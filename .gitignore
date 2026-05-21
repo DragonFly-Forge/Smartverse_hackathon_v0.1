@@ -1,0 +1,10 @@
+# Ignore the Python Virtual Environment
+venv/
+__pycache__/
+
+# Ignore Environment Variables (Database Passwords)
+.env
+
+# Ignore YOLO auto-downloads and heavy weights
+runs/
+*.pt

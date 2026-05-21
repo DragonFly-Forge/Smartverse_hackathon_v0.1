@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vision Node: Edge Eyes</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; background-color: #1a1a1a; color: white; padding: 20px; }
+        video { border: 3px solid #00ffcc; border-radius: 10px; max-width: 100%; width: 640px; }
+        #status { margin: 15px; font-size: 1.2em; color: #ffcc00; }
+    </style>
+</head>
+<body>
+
+    <h1>Eyes Online</h1>
+    <div id="status">Connecting to Brain...</div>
+    
+    <video id="videoElement" autoplay playsinline></video>
+    
+    <canvas id="canvasElement" style="display:none;"></canvas>
+
+    <script>
+        // 1. Connect to your local Python server
+        const socket = io('http://localhost:5000');
+        const statusText = document.getElementById('status');
+
+        socket.on('connect', () => {
+            statusText.innerText = "Connected to Brain! Streaming frames...";
+            statusText.style.color = "#00ffcc";
+        });
+
+        // 2. Turn on the Webcam
+        const video = document.getElementById('videoElement');
+        const canvas = document.getElementById('canvasElement');
+        const context = canvas.getContext('2d');
+
+        navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+            .then(function(stream) {
+                video.srcObject = stream;
+            })
+            .catch(function(err) {
+                console.error("Camera access denied:", err);
+                statusText.innerText = "Camera access denied. Check browser permissions.";
+                statusText.style.color = "red";
+            });
+
+        // 3. The "Flipbook" Loop: Grab a frame and send it every 300ms
+        setInterval(() => {
+            if (video.readyState === video.HAVE_ENOUGH_DATA) {
+                // Set canvas size to match video
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                
+                // Draw the current video frame onto the canvas
+                context.drawImage(video, 0, 0, canvas.width, canvas.height);
+                
+                // Convert the canvas to a JPEG image string (Base64)
+                const imageData = canvas.toDataURL('image/jpeg', 0.5); // 0.5 = 50% quality to keep it fast
+                
+                // Send it to Python!
+                socket.emit('stream_frame', { image: imageData });
+            }
+        }, 1000); // 300 milliseconds = ~3.3 frames per second
+
+        // 4. Catch the Audio Alert from Python and speak it out loud!
+        socket.on('audio_alert', function(data) {
+            console.log("Alert received:", data.message);
+            const speech = new SpeechSynthesisUtterance(data.message);
+            window.speechSynthesis.speak(speech);
+        });
+    </script>
+</body>
+</html>
